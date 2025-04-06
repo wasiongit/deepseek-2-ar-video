@@ -1,82 +1,93 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <meta charset="utf-8">
-    <title>Markerless WebAR Video</title>
-    <!-- Include A-Frame and Zappar -->
-    <script src="https://aframe.io/releases/1.3.0/aframe.min.js"></script>
-    <script src="https://libs.zappar.com/zappar-aframe/1.3.0/zappar-aframe.js"></script>
+    <title>SLAM WebAR Video</title>
+    <!-- Include A-Frame and WebXR polyfill -->
+    <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/aframe-xr@1.0.1/dist/aframe-xr.min.js"></script>
     <style>
-        /* Add a "Tap to Start" button */
-        #startButton {
+        /* Tap-to-place button */
+        #placeButton {
             position: fixed;
-            top: 50%;
+            bottom: 20px;
             left: 50%;
-            transform: translate(-50%, -50%);
-            padding: 20px;
-            background: #4CAF50;
+            transform: translateX(-50%);
+            padding: 12px 24px;
+            background: #2196F3;
             color: white;
             border: none;
-            border-radius: 5px;
+            border-radius: 25px;
             cursor: pointer;
             z-index: 9999;
         }
     </style>
 </head>
 <body>
-    <!-- Tap to start button -->
-    <button id="startButton">TAP TO START AR</button>
+    <!-- Button to place video -->
+    <button id="placeButton">TAP TO PLACE VIDEO</button>
 
     <!-- AR Scene -->
-    <a-scene zappar-camera background="color: #ECECEC">
-        <!-- Instant World Tracking (place video on floors/walls) -->
-        <a-entity 
-            id="video-container"
-            zappar-instant="placement-mode: floor" 
-            visible="false"
-        >
-            <!-- Video element (using a public test video) -->
-            <a-video
-                src="#sample-video"
-                width="2"
-                height="1.125"
-                position="0 0.5 0"
-                rotation="-90 0 0"
-            ></a-video>
+    <a-scene xrweb="enabled: true" xr-mode-ui="enabled: true">
+        <!-- Camera rig -->
+        <a-entity id="rig" position="0 1.6 0">
+            <a-camera></a-camera>
         </a-entity>
 
-        <!-- Sample video (public test URL) -->
-        <video 
-            id="sample-video" 
-            loop 
+        <!-- Video screen (hidden until placed) -->
+        <a-video
+            id="ar-video"
+            src="#video-asset"
+            width="2"
+            height="1.125"
+            position="0 0 -2"
+            visible="false"
+        ></a-video>
+
+        <!-- Video asset (public sample video) -->
+        <video
+            id="video-asset"
+            loop
             crossorigin="anonymous"
             playsinline
             webkit-playsinline
         >
-            <!-- Replace with your video URL -->
             <source src="https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyrides.mp4" type="video/mp4">
         </video>
     </a-scene>
 
     <script>
-        // Handle button click to start AR
-        const startButton = document.getElementById('startButton');
         const scene = document.querySelector('a-scene');
-        const videoContainer = document.querySelector('#video-container');
-        const videoElement = document.querySelector('#sample-video');
+        const placeButton = document.getElementById('placeButton');
+        const videoElement = document.querySelector('#ar-video');
+        const videoAsset = document.querySelector('#video-asset');
 
-        startButton.addEventListener('click', async () => {
-            // Request camera permissions
-            try {
-                await scene.zapparCamera.start();
-                startButton.style.display = 'none';
-                videoContainer.setAttribute('visible', 'true');
-            } catch (error) {
-                alert("Camera access denied. Please enable permissions.");
-            }
+        // Initialize WebXR
+        if (navigator.xr) {
+            scene.addEventListener('loaded', async () => {
+                await scene.xr.enabled();
+            });
+        }
 
-            // Play video on first user interaction
-            videoElement.play();
+        // Place video on surfaces
+        let placementActive = false;
+        placeButton.addEventListener('click', () => {
+            placementActive = true;
+            placeButton.textContent = "TAP A SURFACE TO PLACE";
+        });
+
+        // Handle surface taps
+        scene.addEventListener('click', async (e) => {
+            if (!placementActive || !e.detail.intersection) return;
+
+            // Get hit point in real world
+            const hitPoint = e.detail.intersection.point;
+            videoElement.setAttribute('position', hitPoint);
+            videoElement.setAttribute('visible', 'true');
+            placeButton.style.display = 'none';
+            placementActive = false;
+
+            // Play video
+            videoAsset.play();
         });
     </script>
 </body>
